@@ -1,6 +1,11 @@
 package cc.engeld.traktaverage;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -8,6 +13,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Scanner;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -40,22 +47,38 @@ import retrofit2.Response;
  */
 public class App 
 {
-	private static final String CLIENT_ID = "";
-	private static final String CLIENT_SECRET = "";
-    private static final String DEVICE_CODE = "";
-	private static final String REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob";
-    
-    private static final Logger LOG = LogManager.getLogger();  
-    private static final TraktV2 trakt = new TraktV2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-    
-    protected static TraktV2 getTrakt() {
+    private static final Logger LOG = LogManager.getLogger();
+	private static Properties prop = new Properties();
+
+    private static TraktV2 trakt = null;
+    public static void setTrakt(TraktV2 trakt) {
+		App.trakt = trakt;
+	}
+	protected static TraktV2 getTrakt() {
         return trakt;
     }
     
-    private static String accessToken = "";
+	private static void loadProperties() {
+		LOG.trace("loadProperties(): enter");
+		try (InputStream input = new FileInputStream("app.properties")) {
+			prop.load(input);
+		} catch (IOException ex) {
+			LOG.error("loadProperties(): " + ex.toString());
+		}
+		LOG.trace("loadProperties(): leave");
+	}
+	
+	private static void loadTrakt() {
+		LOG.trace("loadTrakt(): enter");
+		setTrakt(trakt = new TraktV2(
+			prop.getProperty("CLIENT_ID"), 
+			prop.getProperty("CLIENT_SECRET"), 
+			"urn:ietf:wg:oauth:2.0:oob"));
+		LOG.trace("loadTrakt(): leave");
+	}
 	
 	public static void auth() {
-		if(DEVICE_CODE.isEmpty()) {
+		if(prop.getProperty("DEVICE_CODE").isEmpty()) {
 			Response<DeviceCode> codeResponse = null;
 			try {
 				codeResponse = getTrakt().generateDeviceCode();
@@ -63,24 +86,28 @@ public class App
 		        System.out.println("Device Code: " + deviceCode.device_code);
 		        System.out.println("User Code: " + deviceCode.user_code);
 		        System.out.println("Enter the user code at the following URI: " + deviceCode.verification_url);
-		        System.out.println("Set the TEST_DEVICE_CODE variable to run the access token test");
+		        
+		        System.out.println("Press \"ENTER\" when finished...");
+		  	   	Scanner scanner = new Scanner(System.in);
+		  	   	scanner.nextLine();
+		  	   
+				prop.setProperty("DEVICE_CODE", deviceCode.device_code);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
         
-        // get accesstoken
-		if(accessToken == "") {
+		if(prop.getProperty("ACCESS_TOKEN").isEmpty()) {
 			try {
-				Response<AccessToken> response = getTrakt().exchangeDeviceCodeForAccessToken(DEVICE_CODE);
+				Response<AccessToken> response = getTrakt().exchangeDeviceCodeForAccessToken(prop.getProperty("DEVICE_CODE"));
 				
 				if(response.isSuccessful()) {
 					AccessToken accessToken = response.body();
 					System.out.println("Token: " + accessToken.access_token + " created at " + accessToken.created_at);
+					prop.setProperty("ACCESS_TOKEN",accessToken.access_token);
 				}else {
 	    	        if (response.code() == 401) {
 	    	        	System.out.println("authorization required, supply a valid OAuth access token");
-	    	            // authorization required, supply a valid OAuth access token
 	    	        } else {
 	    	        	System.out.println("the request failed for some other reason");
 	    	        	System.out.println(response.code());
@@ -94,19 +121,23 @@ public class App
     
     
     public static void main( String[] args ) {
-        Configurator.setRootLevel(Level.TRACE);
-
+        Configurator.setRootLevel(Level.WARN);
     	LOG.trace("main(): enter");
-//    	auth();
+    	
+    	loadProperties();
+    	loadTrakt();
+    	auth();
 
-    	LOG.info("main(): accessToken = " + accessToken);
-    	trakt.accessToken(accessToken);
+    	LOG.info("main(): accessToken = " + prop.getProperty("ACCESS_TOKEN"));
+    	trakt.accessToken(prop.getProperty("ACCESS_TOKEN"));
     	Users users = trakt.users();
     	
     	getAllRatedEpisodesGroupedByShows(users);
+    	
+    	cleanupProperties();
     	LOG.trace("main(): leave");
     }
-
+	
 	private static void getAllRatedEpisodesGroupedByShows(Users users) {
 		LOG.trace("getAllRatedEpisodesByShows(): enter");
 		try {
@@ -196,15 +227,17 @@ public class App
     	}		
 		LOG.trace("getAllRatedEpisodesByShows(): leave");
 	}
-
 	
-	public static boolean containsShow(Collection<Show> c, String showTitle) {
-	    for(Show o : c) {
-	        if(o != null && o.title.equals(showTitle)) {
-	            return true;
-	        }
-	    }
-	    return false;
+	private static void cleanupProperties() {
+		LOG.trace("cleanupProperties(): enter");
+		try (OutputStream output = new FileOutputStream("app.properties")){
+			prop.store(output, null);
+		} catch (FileNotFoundException e) {
+			LOG.error("cleanupProperties(): " + e.toString());
+		} catch (IOException e) {
+			LOG.error("cleanupProperties(): " + e.toString());
+		}
+		LOG.trace("cleanupProperties(): leave");
 	}
 	
 }
