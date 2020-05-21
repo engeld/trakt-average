@@ -40,10 +40,6 @@ import retrofit2.Response;
  */
 public class App 
 {
-//	protected static final String API_KEY = "e671fcd13abf819e7aa221602c8edb077990179c0f70e904ab9d4b17262bba93";
-//	protected static final String CLIENT_SECRET = "d590f595fda389db5ca36a2f365f2a76008cdb1feef966b1c0856ee9d29d5127";
-//	protected static final String REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob";
-	
 	private static final String CLIENT_ID = "";
 	private static final String CLIENT_SECRET = "";
     private static final String DEVICE_CODE = "";
