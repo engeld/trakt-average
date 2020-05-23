@@ -11,6 +11,10 @@ It finds shows ~~where either a season or a show is completed~~ which has watche
 ### Why Java?
 Because my java was getting rusty and I wanted to brush it up a little bit. Maybe I'll rewrite it in another language later, we'll see.
 
+## Screenshot?
+
+![A screenshot of 'trakt-average' in action](https://i.imgur.com/9EXsTLk.png)
+
 ## How to use
 
 ### Use precompiled binary
