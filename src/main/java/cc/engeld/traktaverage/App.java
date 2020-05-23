@@ -216,6 +216,7 @@ public class App {
 				HashMap<String, RatedSeason> ratedSeasonGrouped = new HashMap<String, RatedSeason>();
 				
 				for (RatedSeason ratedSeason : seasons) {
+					ratedSeasonGrouped.put(ratedSeason.show.title, ratedSeason);
 					System.out.println("Show " + ratedSeason.show.title + " - "+ ratedSeason.season.title + " was rated " + ratedSeason.rating + "/10");
 				}
 				
@@ -230,7 +231,7 @@ public class App {
 		return null;
 	}
 	
-	private static List<RatedShow> getAllRatedShows(Users users){
+	private static HashMap<String, RatedShow> getAllRatedShows(Users users){
 		LOG.trace("getAllRatedShows(): enter");
 
 		try {
@@ -238,18 +239,70 @@ public class App {
 
 			if (response.isSuccessful()) {
 				List<RatedShow> ratedShows = response.body();
+				HashMap<String, RatedShow> tmpHashMap = new HashMap<String, RatedShow>();
+
 				for (RatedShow ratedShow : ratedShows) {
+					tmpHashMap.put(ratedShow.show.title, ratedShow);
 					System.out.println("Show " + ratedShow.show.title + " was rated " + ratedShow.rating + "/10");
 				}
 
 				LOG.trace("getAllRatedShows(): leave");
-				return ratedShows;
+				return tmpHashMap;
 			}
 		} catch (Exception e) {
 			LOG.error("getAllRatedShows(): houston, we have an exception: " + e.getMessage());
 			return null;
 		}
 		return null;
+	}
+	
+	private static void compareRatings(HashMap<String, HashMap<Integer, List<RatedEpisode>>> ratedEpisodesGrouped, 
+															 	 HashMap<String, RatedSeason> ratedSeasonsGrouped, 
+															 			    HashMap<String, RatedShow> ratedShows ) {
+		
+		for (Entry<String, HashMap<Integer, List<RatedEpisode>>> entry : ratedEpisodesGrouped.entrySet()) {
+			System.out.println("===========================================================================");
+			System.out.println("> Show: " + entry.getKey());
+			System.out.println("---------------------------------------------------------------------------");
+
+			float showAverageRating = 0;
+			RatedShow tmpShow = ratedShows.get(entry.getKey());
+			
+			HashMap<Integer, List<RatedEpisode>> value = (HashMap<Integer, List<RatedEpisode>>) entry.getValue(); // map<season, ratedEpi>
+			for (Entry<Integer, List<RatedEpisode>> entry2 : value.entrySet()) {
+				Integer season = entry2.getKey();
+				List<RatedEpisode> seasonEpisodes = entry2.getValue();
+				System.out.println();
+				System.out.println("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+				System.out.println(">> Season " + season);
+				System.out.println("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+
+				float seasonAverageRating = 0;
+				RatedSeason tmpSeason = ratedSeasonsGrouped.get(entry.getKey());
+				for (RatedEpisode episode : seasonEpisodes) {
+					seasonAverageRating += episode.rating.value;
+					System.out.println("+ Episode '" + episode.episode.title + "' (S0" + episode.episode.season + "E"+ episode.episode.number + ") was rated " + episode.rating + "/10");
+				}
+
+				System.out.println("");
+				float seasonAverage = (seasonAverageRating / (float)(seasonEpisodes.size()));
+				System.out.println(">> Average season rating is: " + seasonAverage);
+				if(tmpSeason != null && tmpSeason.season.number == season) {
+					System.out.println("$$ trakt season rating is: " + tmpSeason.rating );
+					
+				}
+				showAverageRating += seasonAverage;
+			}
+			System.out.println("");
+			float showAverage = (showAverageRating / (float)(value.size()));
+			
+			System.out.println("> Average show rating is: " + showAverage);
+			if(tmpShow != null) {
+				System.out.println("$ trakt show rating is: " + tmpShow.rating );
+			}
+			
+			System.out.println("");
+		}
 	}
 
 	private static void cleanupProperties() {
@@ -280,13 +333,13 @@ public class App {
 		// map<Show, map<Season, ratedEpi>>
 		HashMap<String, HashMap<Integer, List<RatedEpisode>>> ratedEpisodesGrouped = getAllRatedEpisodesGroupedByShows(trakt.users());
 		HashMap<String, RatedSeason> ratedSeasonGrouped = getAllRatedSeasonsByShows(trakt.users());
-		List<RatedShow> ratedShow = getAllRatedShows(trakt.users());
+		HashMap<String, RatedShow> ratedShow = getAllRatedShows(trakt.users());
 		
 		// compare the rated seasons/shows to calulated averages rating
-//		if (ratedEpisodesGrouped != null) {
+		if (ratedEpisodesGrouped != null) {
 //			printRatings(ratedEpisodesGrouped);
-//			compareRatings(episodeGrouped);
-//		}
+			compareRatings(ratedEpisodesGrouped, ratedSeasonGrouped, ratedShow);
+		}
 
 		cleanupProperties();
 		LOG.trace("main(): leave");
